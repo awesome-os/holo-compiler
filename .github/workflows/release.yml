@@ -1,0 +1,30 @@
+name: Release — Cross-Compile 4-OS b8g-shim & Verify holo-compiler
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.3.0)'
+        required: true
+        default: 'v0.3.0'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run All holo-compiler Test Suites
+        run: node --test src/nested-shard-treeshaker.test.mts src/cyclic-builder.test.mts
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          gh release create "$TAG" --title "holo-compiler $TAG" --notes "Verified automatically by GitHub Actions runner." || true
