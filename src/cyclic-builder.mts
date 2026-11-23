@@ -176,6 +176,23 @@ export function restoreBucketFromB8p(b8pPath: string, expectedSha256: string, ou
   return count;
 }
 
+/**
+ * Adaptively splits an oversized bucket (exceeding `maxShardBytes` or `maxCycleMs`)
+ * into N smaller sub-shards so every runner micro-cycle stays fast and cache-friendly.
+ */
+export function splitOversizedBucket(
+  bucket: CyclicBucketSpec,
+  subDirNames: readonly string[],
+): CyclicBucketSpec[] {
+  if (subDirNames.length <= 1) return [bucket];
+  return subDirNames.map((sub, idx) => ({
+    id: `${bucket.id}-${String.fromCharCode(97 + (idx % 26))}-${sub}`,
+    ninjaTarget: `${bucket.ninjaTarget}_${sub}`,
+    outputGlobDir: `${bucket.outputGlobDir}/${sub}`,
+    order: bucket.order + (idx + 1) / (subDirNames.length + 1),
+  }));
+}
+
 export function loadOrInitCyclicState(
   statePath: string,
   outDir: string,
@@ -225,6 +242,45 @@ export interface StepReport {
   readonly totalDone: number;
   readonly totalBuckets: number;
   readonly allDone: boolean;
+}
+
+export interface GravityBounceDecision {
+  readonly shouldBounce: boolean;
+  readonly heightPct: number;
+  readonly bounceNum: number;
+  readonly nextBounce: number;
+  readonly reason: 'GROUNDED_ALL_DONE' | 'BOUNCE_NEXT_CYCLE' | 'STOPPED_NO_PROGRESS' | 'STOPPED_MAX_BOUNCES';
+}
+
+/**
+ * Damped Gravity Scheduler: computes whether the cyclic build ball should bounce
+ * into another runner micro-cycle or come to rest on the ground.
+ * Strictly convergent: stops immediately on allDone, zero progress, or maxBounces.
+ */
+export function computeGravityBounce(
+  report: StepReport,
+  bounceNum: number,
+  maxBounces: number = 20,
+): GravityBounceDecision {
+  const remaining = Math.max(0, report.totalBuckets - report.totalDone);
+  const heightPct = report.totalBuckets > 0 ? Math.round((remaining / report.totalBuckets) * 100) : 0;
+
+  if (report.allDone || remaining === 0) {
+    return { shouldBounce: false, heightPct: 0, bounceNum, nextBounce: bounceNum, reason: 'GROUNDED_ALL_DONE' };
+  }
+  if (report.completedThisCycle.length === 0) {
+    return { shouldBounce: false, heightPct, bounceNum, nextBounce: bounceNum, reason: 'STOPPED_NO_PROGRESS' };
+  }
+  if (bounceNum >= maxBounces) {
+    return { shouldBounce: false, heightPct, bounceNum, nextBounce: bounceNum, reason: 'STOPPED_MAX_BOUNCES' };
+  }
+  return {
+    shouldBounce: true,
+    heightPct,
+    bounceNum,
+    nextBounce: bounceNum + 1,
+    reason: 'BOUNCE_NEXT_CYCLE',
+  };
 }
 
 export function runCyclicStep(opts: StepOptions): StepReport {

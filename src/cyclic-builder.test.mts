@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
+  computeGravityBounce,
   loadOrInitCyclicState,
   restoreBucketFromB8p,
   runCyclicStep,
+  splitOversizedBucket,
   type CyclicBucketSpec,
 } from './cyclic-builder.mts';
 
@@ -69,5 +71,41 @@ describe('sectium-maintenance cyclic-builder (micro-cycle resumable .b8p shard b
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }
+  });
+
+  it('adaptively splits an oversized bucket into smaller ordered sub-shards for fast runner feedback', () => {
+    const bigBlink: CyclicBucketSpec = {
+      id: '11-blink-core',
+      ninjaTarget: 'third_party/blink/renderer/core:core',
+      outputGlobDir: 'obj/third_party/blink/renderer/core',
+      order: 11,
+    };
+    const subShards = splitOversizedBucket(bigBlink, ['dom', 'layout', 'paint', 'style']);
+    assert.equal(subShards.length, 4);
+    assert.equal(subShards[0].id, '11-blink-core-a-dom');
+    assert.equal(subShards[3].id, '11-blink-core-d-style');
+    assert.ok(subShards[0].order > 11 && subShards[3].order < 12);
+    assert.equal(subShards[1].outputGlobDir, 'obj/third_party/blink/renderer/core/layout');
+  });
+
+  it('Damped Gravity Scheduler bounces strictly downward to 0% ground and guards against infinite loops', () => {
+    const b1 = computeGravityBounce({ completedThisCycle: ['01'], totalDone: 1, totalBuckets: 3, allDone: false }, 1, 10);
+    assert.equal(b1.shouldBounce, true);
+    assert.equal(b1.heightPct, 67);
+    assert.equal(b1.nextBounce, 2);
+    assert.equal(b1.reason, 'BOUNCE_NEXT_CYCLE');
+
+    const b2 = computeGravityBounce({ completedThisCycle: ['02'], totalDone: 2, totalBuckets: 3, allDone: false }, 2, 10);
+    assert.equal(b2.shouldBounce, true);
+    assert.equal(b2.heightPct, 33);
+
+    const grounded = computeGravityBounce({ completedThisCycle: ['03'], totalDone: 3, totalBuckets: 3, allDone: true }, 3, 10);
+    assert.equal(grounded.shouldBounce, false);
+    assert.equal(grounded.heightPct, 0);
+    assert.equal(grounded.reason, 'GROUNDED_ALL_DONE');
+
+    const stalled = computeGravityBounce({ completedThisCycle: [], totalDone: 1, totalBuckets: 3, allDone: false }, 2, 10);
+    assert.equal(stalled.shouldBounce, false);
+    assert.equal(stalled.reason, 'STOPPED_NO_PROGRESS');
   });
 });
