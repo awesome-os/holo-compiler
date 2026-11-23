@@ -1,0 +1,76 @@
+name: holo-compiler Reusable Build & Release
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      title:
+        required: false
+        type: string
+        default: ''
+      notes:
+        required: false
+        type: string
+        default: 'Built, verified, and SHA-256 hashed automatically by awesome-os/holo-compiler reusable runner.'
+      use-zig:
+        required: false
+        type: boolean
+        default: false
+      zig-version:
+        required: false
+        type: string
+        default: '0.14.0'
+      build-cmd:
+        required: true
+        type: string
+      artifact-glob:
+        required: true
+        type: string
+      sha-dir:
+        required: false
+        type: string
+        default: 'dist'
+
+permissions:
+  contents: write
+
+jobs:
+  holo-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - if: ${{ inputs.use-zig }}
+        uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ inputs.zig-version }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .b8g-cas
+            .zig-cache
+          key: holo-cas-${{ runner.os }}-${{ github.repository }}-${{ hashFiles('src/**', 'include/**', 'wm/**') }}
+          restore-keys: |
+            holo-cas-${{ runner.os }}-${{ github.repository }}-
+      - name: Build & Verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${{ inputs.build-cmd }}
+          mkdir -p "${{ inputs.sha-dir }}"
+          sha256sum ${{ inputs.artifact-glob }} > "${{ inputs.sha-dir }}/SHA256SUMS.txt"
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          TITLE: ${{ inputs.title }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          REL_TITLE="${TITLE:-${GITHUB_REPOSITORY#*/} $TAG}"
+          gh release create "$TAG" ${{ inputs.artifact-glob }} "${{ inputs.sha-dir }}/SHA256SUMS.txt" --title "$REL_TITLE" --notes "$NOTES" || gh release upload "$TAG" ${{ inputs.artifact-glob }} "${{ inputs.sha-dir }}/SHA256SUMS.txt" --clobber
