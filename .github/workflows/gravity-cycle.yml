@@ -58,4 +58,5 @@ jobs:
           gh workflow run gravity-cycle.yml -f bounce=${{ steps.drop.outputs.next_bounce }} -f max_bounces=${{ github.event.inputs.max_bounces || '4' }} -f buckets_per_bounce=${{ github.event.inputs.buckets_per_bounce || '5' }} -f dry_run=${{ github.event.inputs.dry_run || 'true' }}
       - name: Ball Rests on Ground
         if: steps.drop.outputs.should_bounce != 'true'
-        run: echo "GROUNDED: ${{ steps.drop.outputs.reason }} (height=${{ steps.drop.outputs.height_pct }}%)"
+        run: |
+          echo "GROUNDED ${{ steps.drop.outputs.reason }} (height=${{ steps.drop.outputs.height_pct }}%)"
