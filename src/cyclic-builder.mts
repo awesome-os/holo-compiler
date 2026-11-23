@@ -370,10 +370,24 @@ if (isMain) {
     const dryRun = process.argv.includes('--dry-run');
     const countIdx = process.argv.indexOf('--buckets');
     const maxBucketsPerCycle = countIdx >= 0 ? Math.max(1, Number(process.argv[countIdx + 1] ?? 1)) : 1;
+    const bounceIdx = process.argv.indexOf('--bounce');
+    const bounceNum = bounceIdx >= 0 ? Math.max(1, Number(process.argv[bounceIdx + 1] ?? 1)) : 1;
+    const maxBounceIdx = process.argv.indexOf('--max-bounces');
+    const maxBounces = maxBounceIdx >= 0 ? Math.max(1, Number(process.argv[maxBounceIdx + 1] ?? 14)) : 14;
     const report = runCyclicStep({ statePath, outDir, casDir, maxBucketsPerCycle, dryRun });
+    const decision = computeGravityBounce(report, bounceNum, maxBounces);
     console.log(
-      `[cyclic-builder] Cycle complete (${dryRun ? 'dry-run' : 'live'}): +${report.completedThisCycle.length} [${report.completedThisCycle.join(', ')}] -> ${report.totalDone}/${report.totalBuckets} DONE`,
+      `[cyclic-builder] Drop #${bounceNum} (${dryRun ? 'dry-run' : 'live'}): +${report.completedThisCycle.length} [${report.completedThisCycle.join(', ')}] -> ${report.totalDone}/${report.totalBuckets} DONE | height=${decision.heightPct}% | ${decision.reason}`,
     );
+    if (process.argv.includes('--github-output') && process.env.GITHUB_OUTPUT) {
+      const lines = [
+        `should_bounce=${decision.shouldBounce}`,
+        `next_bounce=${decision.nextBounce}`,
+        `height_pct=${decision.heightPct}`,
+        `reason=${decision.reason}`,
+      ].join('\n') + '\n';
+      writeFileSync(process.env.GITHUB_OUTPUT, lines, { flag: 'a' });
+    }
   } else {
     console.log('Usage: cyclic-builder.mts <status | step [--dry-run] [--buckets N]>');
   }

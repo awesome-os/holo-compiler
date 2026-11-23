@@ -10,13 +10,13 @@ on:
       max_bounces:
         description: 'Safety cap on max bounces'
         required: false
-        default: '14'
+        default: '4'
       buckets_per_bounce:
         description: 'Shards to build per bounce'
         required: false
-        default: '2'
+        default: '5'
       dry_run:
-        description: 'Dry-run mode (true for demo without Chromium tree)'
+        description: 'Dry-run mode'
         required: false
         default: 'true'
 
@@ -37,39 +37,25 @@ jobs:
           path: |
             .b8g-cas
             src/dist/cyclic-state.json
-          key: gravity-ball-${{ runner.os }}-b${{ github.event.inputs.bounce || '1' }}
+          key: gravity-ball-${{ runner.os }}-b${{ github.event.inputs.bounce || '1' }}-${{ github.run_id }}
           restore-keys: |
             gravity-ball-${{ runner.os }}-
-      - name: Execute Gravity Drop & Compute Next Bounce
+      - name: Execute Gravity Drop
         id: drop
         env:
-          BOUNCE: ${{ github.event.inputs.bounce || '1' }}
-          MAX_BOUNCES: ${{ github.event.inputs.max_bounces || '14' }}
-          BUCKETS: ${{ github.event.inputs.buckets_per_bounce || '2' }}
-          DRY_RUN: ${{ github.event.inputs.dry_run || 'true' }}
+          SECTIUM_OUT_DIR: src/dist/out
         run: |
-          node -e "
-            import('./src/cyclic-builder.mts').then(m => {
-              const r = m.runCyclicStep({
-                statePath: 'src/dist/cyclic-state.json',
-                outDir: 'src/dist/out',
-                casDir: '.b8g-cas/gravity',
-                maxBucketsPerCycle: Number(process.env.BUCKETS),
-                dryRun: process.env.DRY_RUN === 'true',
-              });
-              const d = m.computeGravityBounce(r, Number(process.env.BOUNCE), Number(process.env.MAX_BOUNCES));
-              console.log(JSON.stringify({ report: r, decision: d }, null, 2));
-              const fs = require('fs');
-              fs.appendFileSync(process.env.GITHUB_OUTPUT, 'should_bounce=' + d.shouldBounce + '\nnext_bounce=' + d.nextBounce + '\nheight_pct=' + d.heightPct + '\nreason=' + d.reason + '\n');
-            });
-          "
-      - name: Bounce Back Up (Self-Dispatch Next Cycle Until Grounded)
+          mkdir -p src/dist/out
+          FLAG=""
+          if [ "${{ github.event.inputs.dry_run || 'true' }}" = "true" ]; then FLAG="--dry-run"; fi
+          node src/cyclic-builder.mts step $FLAG --buckets ${{ github.event.inputs.buckets_per_bounce || '5' }} --bounce ${{ github.event.inputs.bounce || '1' }} --max-bounces ${{ github.event.inputs.max_bounces || '4' }} --github-output
+      - name: Bounce Back Up (Self-Dispatch Next Cycle)
         if: steps.drop.outputs.should_bounce == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Ball height: ${{ steps.drop.outputs.height_pct }}% -> bouncing to cycle #${{ steps.drop.outputs.next_bounce }}..."
-          gh workflow run gravity-cycle.yml -f bounce=${{ steps.drop.outputs.next_bounce }} -f max_bounces=${{ github.event.inputs.max_bounces || '14' }} -f buckets_per_bounce=${{ github.event.inputs.buckets_per_bounce || '2' }} -f dry_run=${{ github.event.inputs.dry_run || 'true' }}
+          echo "Ball height ${{ steps.drop.outputs.height_pct }}% -> bouncing to Drop #${{ steps.drop.outputs.next_bounce }}..."
+          gh workflow run gravity-cycle.yml -f bounce=${{ steps.drop.outputs.next_bounce }} -f max_bounces=${{ github.event.inputs.max_bounces || '4' }} -f buckets_per_bounce=${{ github.event.inputs.buckets_per_bounce || '5' }} -f dry_run=${{ github.event.inputs.dry_run || 'true' }}
       - name: Ball Rests on Ground
         if: steps.drop.outputs.should_bounce != 'true'
-        run: echo "Gravity cycle finished: ${{ steps.drop.outputs.reason }} (height=${{ steps.drop.outputs.height_pct }}%)"
+        run: echo "GROUNDED: ${{ steps.drop.outputs.reason }} (height=${{ steps.drop.outputs.height_pct }}%)"
