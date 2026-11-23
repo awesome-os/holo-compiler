@@ -1,62 +1,80 @@
-name: holo-compiler Damped Gravity Cyclic Runner
+name: holo-compiler Damped Gravity Real Build
 
 on:
   workflow_dispatch:
     inputs:
       bounce:
-        description: 'Current gravity bounce number'
+        description: 'Current gravity bounce (1=b8g-shim, 2=libsectium-display, 3=publish)'
         required: false
         default: '1'
-      max_bounces:
-        description: 'Safety cap on max bounces'
+      tag:
+        description: 'Release tag to publish when grounded'
         required: false
-        default: '4'
-      buckets_per_bounce:
-        description: 'Shards to build per bounce'
-        required: false
-        default: '5'
-      dry_run:
-        description: 'Dry-run mode'
-        required: false
-        default: 'true'
+        default: 'v0.5.0-gravity'
 
 permissions:
   actions: write
   contents: write
 
 jobs:
-  gravity-drop:
+  gravity-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
       - uses: actions/cache@v4
         with:
-          path: |
-            .b8g-cas
-            src/dist/cyclic-state.json
-          key: gravity-ball-${{ runner.os }}-b${{ github.event.inputs.bounce || '1' }}-${{ github.run_id }}
+          path: dist-gravity
+          key: gravity-real-${{ github.event.inputs.tag || 'v0.5.0-gravity' }}-b${{ github.event.inputs.bounce || '1' }}-${{ github.run_id }}
           restore-keys: |
-            gravity-ball-${{ runner.os }}-
-      - name: Execute Gravity Drop
-        id: drop
-        env:
-          SECTIUM_OUT_DIR: src/dist/out
+            gravity-real-${{ github.event.inputs.tag || 'v0.5.0-gravity' }}-
+
+      - name: Drop 1 — Real Cross-Compile 4-OS b8g-shim (Win64 + Linux + macOS)
+        if: ${{ (github.event.inputs.bounce || '1') == '1' }}
         run: |
-          mkdir -p src/dist/out
-          FLAG=""
-          if [ "${{ github.event.inputs.dry_run || 'true' }}" = "true" ]; then FLAG="--dry-run"; fi
-          node src/cyclic-builder.mts step $FLAG --buckets ${{ github.event.inputs.buckets_per_bounce || '5' }} --bounce ${{ github.event.inputs.bounce || '1' }} --max-bounces ${{ github.event.inputs.max_bounces || '4' }} --github-output
-      - name: Bounce Back Up (Self-Dispatch Next Cycle)
-        if: steps.drop.outputs.should_bounce == 'true'
+          mkdir -p dist-gravity
+          zig cc -target x86_64-windows-gnu -std=c11 -O2 -s -Wall -Wextra -Werror src/b8g_shim.c -o dist-gravity/b8g-shim.exe
+          zig cc -target x86_64-linux-musl  -std=c11 -O2 -s -Wall -Wextra -Werror src/b8g_shim.c -o dist-gravity/b8g-shim-linux-x64
+          zig cc -target aarch64-linux-musl -std=c11 -O2 -s -Wall -Wextra -Werror src/b8g_shim.c -o dist-gravity/b8g-shim-linux-arm64
+          zig cc -target aarch64-macos      -std=c11 -O2 -s -Wall -Wextra -Werror src/b8g_shim.c -o dist-gravity/b8g-shim-macos-arm64
+          ./dist-gravity/b8g-shim-linux-x64 --version
+          ls -lh dist-gravity/
+
+      - name: Drop 2 — Real Cross-Compile 5-OS libsectium-display + 78 C11 Assertions
+        if: ${{ github.event.inputs.bounce == '2' }}
+        run: |
+          mkdir -p dist-gravity
+          zig cc -target x86_64-windows-gnu -std=c11 -O2 -Wall -Wextra -Werror -shared -Iinclude src/sectium_display.c -o dist-gravity/libsectium_display.dll
+          zig cc -target x86_64-linux-musl  -std=c11 -O2 -Wall -Wextra -Werror -shared -fPIC -Iinclude src/sectium_display.c -o dist-gravity/libsectium_display-linux-x64.so
+          zig cc -target aarch64-linux-musl -std=c11 -O2 -Wall -Wextra -Werror -shared -fPIC -Iinclude src/sectium_display.c -o dist-gravity/libsectium_display-linux-arm64.so
+          zig cc -target aarch64-macos      -std=c11 -O2 -Wall -Wextra -Werror -shared -fPIC -Iinclude src/sectium_display.c -o dist-gravity/libsectium_display-macos-arm64.dylib
+          zig cc -target wasm32-wasi        -std=c11 -O2 -Wall -Wextra -Werror -mexec-model=reactor -Wl,--export-dynamic -Iinclude src/sectium_display.c -o dist-gravity/libsectium_display.wasm
+          gcc -std=c11 -O2 -Wall -Wextra -Werror -DSECTIUM_DISPLAY_STATIC -Iinclude src/sectium_display_test.c src/sectium_display.c -o test_display && ./test_display
+          ls -lh dist-gravity/
+
+      - name: Drop 3 — Final Verify, Hash & Publish All 9 Real Multi-OS Binaries (GROUNDED)
+        if: ${{ github.event.inputs.bounce == '3' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || 'v0.5.0-gravity' }}
         run: |
-          echo "Ball height ${{ steps.drop.outputs.height_pct }}% -> bouncing to Drop #${{ steps.drop.outputs.next_bounce }}..."
-          gh workflow run gravity-cycle.yml -f bounce=${{ steps.drop.outputs.next_bounce }} -f max_bounces=${{ github.event.inputs.max_bounces || '4' }} -f buckets_per_bounce=${{ github.event.inputs.buckets_per_bounce || '5' }} -f dry_run=${{ github.event.inputs.dry_run || 'true' }}
-      - name: Ball Rests on Ground
-        if: steps.drop.outputs.should_bounce != 'true'
+          node --test src/nested-shard-treeshaker.test.mts src/cyclic-builder.test.mts
+          sha256sum dist-gravity/* > dist-gravity/SHA256SUMS.txt
+          ls -lh dist-gravity/
+          gh release create "$TAG" dist-gravity/* --title "holo-compiler $TAG — Real 3-Bounce Damped Gravity Multi-OS Release" --notes "9 real multi-OS binaries (Win64, Linux x64/ARM64, macOS ARM64, WASI) built across 3 self-bouncing Damped Gravity drops." || gh release upload "$TAG" dist-gravity/* --clobber
+
+      - name: Bounce Back Up to Next Real Build Drop
+        if: ${{ (github.event.inputs.bounce || '1') == '1' || github.event.inputs.bounce == '2' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUR: ${{ github.event.inputs.bounce || '1' }}
+          TAG: ${{ github.event.inputs.tag || 'v0.5.0-gravity' }}
         run: |
-          echo "GROUNDED ${{ steps.drop.outputs.reason }} (height=${{ steps.drop.outputs.height_pct }}%)"
+          NEXT=$((CUR + 1))
+          echo "Real Drop #$CUR complete -> bouncing to Drop #$NEXT..."
+          gh workflow run gravity-cycle.yml -f bounce="$NEXT" -f tag="$TAG"
