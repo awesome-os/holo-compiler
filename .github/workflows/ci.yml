@@ -10,3 +10,7 @@ jobs:
           node-version: "22"
       - name: Run Shard Tree-Shaker, Late-Link Planner & Micro-Cycle .b8p Suites
         run: node --test src/nested-shard-treeshaker.test.mts src/cyclic-builder.test.mts
+      - name: Run Native C11 Unified ABI & Sectium Display Self-Tests
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -DHOLO_UNIFIED_ABI_STATIC -Iinclude src/holo_unified_abi_test.c src/holo_unified_abi.c -o /tmp/holo_unified_abi_test && /tmp/holo_unified_abi_test
+          cc -std=c11 -O2 -Wall -Wextra -Werror -DSECTIUM_DISPLAY_STATIC -Iinclude src/sectium_display_test.c src/sectium_display.c -o /tmp/sectium_display_test && /tmp/sectium_display_test
