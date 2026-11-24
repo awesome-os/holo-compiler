@@ -16,3 +16,20 @@ zig cc -std=c11 -O2 -Wall -Wextra -Werror -DHOLO_UNIFIED_ABI_STATIC -Iinclude sr
 
 ## License
 MIT
+
+## Quick Install & Run (Windows / Linux / macOS)
+
+```powershell
+# Windows (PowerShell) — 1-line install & run
+irm https://github.com/awesome-os/holo-compiler/releases/latest/download/b8g-shim.exe -OutFile "holo-compiler.exe"; .\holo-compiler.exe --version
+```
+
+```sh
+# Linux (x64) — 1-line install & run
+curl -fsSL https://github.com/awesome-os/holo-compiler/releases/latest/download/b8g-shim-linux-x64 -o "holo-compiler" && chmod +x "holo-compiler" && ./holo-compiler --version
+```
+
+```sh
+# macOS (Apple Silicon) — 1-line install & run
+curl -fsSL https://github.com/awesome-os/holo-compiler/releases/latest/download/b8g-shim-macos-arm64 -o "holo-compiler" && chmod +x "holo-compiler" && ./holo-compiler --version
+```
