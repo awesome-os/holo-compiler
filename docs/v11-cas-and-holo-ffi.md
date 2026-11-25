@@ -22,3 +22,12 @@ The unified `v11` store (`HOLO_CAS_DIR/v11`) is a **SHA-512 Universal Git Object
 2. Projects a **0-byte hardlink** into `v11/links/<sha512[:16]>-<name>.{dll,so,dylib,wasm}` so Windows `LoadLibraryW` and macOS `dlopen` see the expected file extension.
 3. Optionally verifies `B8G_ABI_MAGIC_V3` (`0x33564742`) via `abiMagicSymbol` before any call crosses the FFI boundary.
 4. Executes `.wasm` modules directly via `WebAssembly.instantiate` with zero native addon required.
+
+---
+
+## 3. `*-package` Is Pure Metadata (2-Lane Semantic Splitting)
+
+Awesome-OS never assumes an npm package *is* JavaScript, a Cargo crate *is* Rust, or a wheel *is* Python. Manifests (`package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `pubspec.yaml`) are treated strictly as **metadata**, while `holo-pm` (`src/semantic-lane-splitter.mts`) splits every file by its true artifact type over ONE `v11` CAS:
+
+- **Text / Source Lane (`repository/<lang>/...`):** 0-byte hardlinks for instant grep/BM25/LSP indexing, auto-routing cross-language bindings (`.ts` inside a `cargo` crate → `repository/npm/cargo/<pkg>/`, `.py` inside PyO3 → `repository/pypi/cargo/<pkg>/`).
+- **Binary Lane (`assets/<target>-<abi>/<pkg>/`):** Separates `.node` (`napi`), `.pyd` (`abi3`/`cpython`), `.dll`/`.so`/`.dylib` (`b8g-v3`), and `.wasm` (`wasi`) with **prebuilt-first `v11` lookup** — eliminating `node-gyp` / `pip` / native rebuilds whenever an ABI-compatible blob already exists.
