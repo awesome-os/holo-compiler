@@ -29,7 +29,20 @@ git ls-remote repository://local/awesome-os/cargo
 git clone repository://local/awesome-os/models
 ```
 
-## 4. Run Any Projection with `holo-project`
+## 4. Local-by-Default `./bin/` Hardlinks & Global `-g` Collision Guard
+
+```powershell
+# Default: hardlinks directly into ./bin/<tool> (0 B extra disk, zero global collisions)
+# and pins the exact v11 SHA-512 in ./holo-compiler-lockfile.json
+holo-pm install repository://github.com/awesome-os/awesome-os-desktop@main
+.\bin\awesome-os-desktop.exe
+
+# Global opt-in (-g): hardlinks into ~/.b8g/bin/ with strict ownership collision guard
+# (refuses silent overwrite unless --as <alias> or --force-default / `holo-pm use` is passed)
+holo-pm install -g repository://github.com/awesome-os/coreutils@main
+```
+
+## 5. Run Any Projection with `holo-project`
 
 ```powershell
 # Ephemeral 0-byte hardlink projection (auto-purges after run)
