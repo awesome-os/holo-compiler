@@ -19,17 +19,10 @@ MIT
 
 ## Quick Install & Run (Windows / Linux / macOS)
 
-```powershell
-# Windows (PowerShell) — 1-line install & run
-irm https://github.com/awesome-os/holo-compiler/releases/latest/download/b8g-shim.exe -OutFile "holo-compiler.exe"; .\holo-compiler.exe --version
-```
-
 ```sh
-# Linux (x64) — 1-line install & run
-curl -fsSL https://github.com/awesome-os/holo-compiler/releases/latest/download/b8g-shim-linux-x64 -o "holo-compiler" && chmod +x "holo-compiler" && ./holo-compiler --version
-```
+# Install / hydrate from v11 CAS via holo-pm
+holo-pm install repository://github.com/awesome-os/holo-compiler@main
 
-```sh
-# macOS (Apple Silicon) — 1-line install & run
-curl -fsSL https://github.com/awesome-os/holo-compiler/releases/latest/download/b8g-shim-macos-arm64 -o "holo-compiler" && chmod +x "holo-compiler" && ./holo-compiler --version
+# Or project & run directly via holo-project (0-byte hardlink)
+holo-project "project://cpp/holo-compiler?from=repository://github.com/awesome-os/holo-compiler@main"
 ```
