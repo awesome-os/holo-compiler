@@ -143,15 +143,21 @@ function appendV11WithoutDoubling(baseDir: string): string {
 
 /**
  * Resolves the canonical unified CAS `v11` store root directory:
- *   1. `B8G_GHOST_CACHE_DIR` -> `<B8G_GHOST_CACHE_DIR>/v11`
- *   2. `PNPM_HOME`           -> `<PNPM_HOME>/store/v11`
- *   3. Fallback              -> `~/.b8g/cas/v11`
+ *   1. `HOLO_CAS_DIR`        -> `<HOLO_CAS_DIR>/v11`
+ *   2. `B8G_GHOST_CACHE_DIR` -> `<B8G_GHOST_CACHE_DIR>/v11`
+ *   3. `PNPM_HOME`           -> `<PNPM_HOME>/store/v11`
+ *   4. Fallback              -> `~/.b8g/cas/v11`
  *
  * Ensures the `/v11` suffix is never doubled.
  */
 export function resolveUnifiedCasRoot(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): string {
+  const holoCasDir = env.HOLO_CAS_DIR?.trim();
+  if (holoCasDir) {
+    return appendV11WithoutDoubling(holoCasDir);
+  }
+
   const ghostCacheDir = env.B8G_GHOST_CACHE_DIR?.trim();
   if (ghostCacheDir) {
     return appendV11WithoutDoubling(ghostCacheDir);
