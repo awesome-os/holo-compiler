@@ -1,0 +1,15 @@
+{
+  "schema": "holo-ci.v1",
+  "name": "holo-compiler",
+  "kind": "control-plane",
+  "tests": [
+    "node --test src/cyclic-builder.test.mts src/git-forge.test.mts src/go-dart-bridge.test.mts src/holo-pm-install.test.mts src/holo-project.test.mts src/holo-projections.test.mts src/nested-shard-treeshaker.test.mts src/stealify-ssa.test.mts toolchains/selfhost-matrix.test.mts"
+  ],
+  "docs": [
+    "README.md"
+  ],
+  "guards": {
+    "zeroGhost": true,
+    "zeroCasV1": true
+  }
+}
