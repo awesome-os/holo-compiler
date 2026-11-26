@@ -26,7 +26,7 @@ With `bin/` on `PATH`, stock `git` automatically invokes `git-remote-repository`
 
 ```powershell
 git ls-remote repository://local/awesome-os/cargo
-git clone repository://local/awesome-os/models
+git clone repository://local/awesome-os/agent-platform
 ```
 
 ## 4. Local-by-Default `./bin/` Hardlinks & Global `-g` Collision Guard
@@ -34,8 +34,8 @@ git clone repository://local/awesome-os/models
 ```powershell
 # Default: hardlinks directly into ./bin/<tool> (0 B extra disk, zero global collisions)
 # and pins the exact v11 SHA-512 in ./holo-compiler-lockfile.json
-holo-pm install repository://github.com/awesome-os/awesome-os-desktop@main
-.\bin\awesome-os-desktop.exe
+holo-pm install repository://github.com/awesome-os/desktop@main
+.\bin\desktop.exe
 
 # Global opt-in (-g): hardlinks into ~/.b8g/bin/ with strict ownership collision guard
 # (refuses silent overwrite unless --as <alias> or --force-default / `holo-pm use` is passed)
@@ -49,5 +49,5 @@ holo-pm install -g repository://github.com/awesome-os/coreutils@main
 holo-project "project://go/gitaly?from=repository://github.com/awesome-os/gitaly@main"
 
 # Persistent workspace projection
-holo-project "project://node/app.mts?from=repository://github.com/awesome-os/models@main&mode=persistent"
+holo-project "project://node/app.mts?from=repository://github.com/awesome-os/agent-platform@main&mode=persistent"
 ```
